@@ -31,7 +31,7 @@ export TELEGRAM_BOT_TOKEN="your_token_here"
 ## Run
 
 ```bash
-python super_bot.py
+python main.py
 ```
 
 ## Railpack deployment
@@ -41,7 +41,7 @@ The project includes a `railpack.json` file with a valid `start` command:
 ```json
 {
   "$schema": "https://railpack.com/schema.json",
-  "start": "python super_bot.py"
+  "start": "python main.py"
 }
 ```
 

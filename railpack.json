@@ -1,4 +1,4 @@
 {
   "$schema": "https://railpack.com/schema.json",
-  "start": "python super_bot.py"
+  "start": "python main.py"
 }
