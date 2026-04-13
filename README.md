@@ -34,6 +34,19 @@ export TELEGRAM_BOT_TOKEN="your_token_here"
 python super_bot.py
 ```
 
+## Railpack deployment
+
+The project includes a `railpack.json` file with a valid `start` command:
+
+```json
+{
+  "$schema": "https://railpack.com/schema.json",
+  "start": "python super_bot.py"
+}
+```
+
+If you rename the entry script, update the `start` value to match the new filename.
+
 ## Commands
 
 - `/start` or `/help` — show help
