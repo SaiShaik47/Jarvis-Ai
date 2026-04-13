@@ -15,9 +15,18 @@ from telegram.ext import (
 )
 
 BASE_URL = "https://llm-flip.vercel.app"
-DEFAULT_MODEL = "mistral-large"
+DEFAULT_MODEL = "mistral-small"
 MAX_TURNS_PER_CHAT = 16
 CALLBACK_MODEL_PREFIX = "model:"
+FALLBACK_MODELS = [
+    "mistral-small",
+    "mistral-medium",
+    "mistral-large-2411",
+    "mistral-large-3",
+    "mixtral-8x22b",
+    "deepseek-v3",
+    "glm-4-flash",
+]
 
 
 @dataclass
@@ -36,13 +45,27 @@ class FlipClient:
         response.raise_for_status()
         data = response.json()
         if isinstance(data, list):
-            return data
+            return self._normalize_models(data)
         if isinstance(data, dict):
             for key in ("models", "data", "result"):
                 value = data.get(key)
                 if isinstance(value, list):
-                    return value
+                    return self._normalize_models(value)
         raise ValueError("Unexpected /models response format")
+
+    @staticmethod
+    def _normalize_models(raw_models: List[object]) -> List[str]:
+        models: List[str] = []
+        for item in raw_models:
+            if isinstance(item, str):
+                models.append(item)
+            elif isinstance(item, dict):
+                model_id = item.get("id") or item.get("model")
+                if isinstance(model_id, str) and model_id:
+                    models.append(model_id)
+        if not models:
+            raise ValueError("No valid model identifiers found in /models response")
+        return models
 
     def new_session(self, model: str, system_prompt: Optional[str] = None) -> str:
         params = {"model": model}
@@ -75,6 +98,7 @@ class SuperTelegramBot:
     def __init__(self, token: str):
         self.flip = FlipClient()
         self.sessions: Dict[int, ChatSession] = {}
+        self.valid_models: List[str] = FALLBACK_MODELS.copy()
         self.app = Application.builder().token(token).build()
         self._register_handlers()
 
@@ -122,7 +146,7 @@ class SuperTelegramBot:
 
         requested_model = context.args[0]
         try:
-            all_models = self.flip.models()
+            all_models = self._get_valid_models()
             if requested_model not in all_models:
                 await update.message.reply_text(
                     f"Unknown model: {requested_model}\nUse /models to see valid models."
@@ -138,7 +162,7 @@ class SuperTelegramBot:
     async def models_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         del context
         try:
-            models = self.flip.models()
+            models = self._get_valid_models(force_refresh=True)
             keyboard = self._model_keyboard(models, columns=2)
             current = self._chat_session(update.effective_chat.id).model
             await update.message.reply_text(
@@ -152,7 +176,7 @@ class SuperTelegramBot:
     async def check_models_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         del context
         try:
-            models = self.flip.models()
+            models = self._get_valid_models(force_refresh=True)
             checks: List[Tuple[str, bool, str]] = []
             for model in models:
                 try:
@@ -189,7 +213,7 @@ class SuperTelegramBot:
         del context
         chat_id = update.effective_chat.id
         self.sessions[chat_id] = ChatSession()
-        await update.message.reply_text("♻️ Session reset. Model is back to mistral-large.")
+        await update.message.reply_text(f"♻️ Session reset. Model is back to {DEFAULT_MODEL}.")
 
     async def new_chat_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         del context
@@ -224,6 +248,7 @@ class SuperTelegramBot:
         del context
         chat_id = update.effective_chat.id
         session = self._chat_session(chat_id)
+        session.model = self._safe_model(session.model)
         message = update.message.text.strip()
 
         try:
@@ -249,6 +274,19 @@ class SuperTelegramBot:
         except Exception:
             session.sid = self.flip.new_session(model=session.model)
             return self.flip.chat(session.model, session.sid, message)
+
+    def _get_valid_models(self, force_refresh: bool = False) -> List[str]:
+        if force_refresh or not self.valid_models:
+            self.valid_models = self.flip.models()
+        return self.valid_models
+
+    def _safe_model(self, candidate: str) -> str:
+        valid = self._get_valid_models()
+        if candidate in valid:
+            return candidate
+        if DEFAULT_MODEL in valid:
+            return DEFAULT_MODEL
+        return valid[0]
 
     @staticmethod
     def _model_keyboard(models: List[str], columns: int = 2) -> InlineKeyboardMarkup:
