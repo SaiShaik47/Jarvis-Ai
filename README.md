@@ -3,7 +3,10 @@
 A Telegram bot that connects to the Flip LLM API and supports:
 
 - Multi-model switching (`/model`, `/models`)
+- Model toggle buttons (inline keyboard in Telegram)
+- Reachability checks for every model (`/checkmodels`)
 - Session-based memory (`sid` per Telegram chat)
+- Automatic chat rollover to a new session after a turn limit
 - Chat history lookup (`/history`)
 - Session reset (`/reset`)
 
@@ -35,7 +38,9 @@ python super_bot.py
 
 - `/start` or `/help` — show help
 - `/model <model_name>` — switch active model and reset session
-- `/models` — list available models from Flip API
+- `/models` — open toggle buttons for available models
+- `/checkmodels` — test each model by creating a session and show health
+- `/newchat` — force a fresh chat thread with current model
 - `/history` — print active remote session info/history
 - `/reset` — reset local state to default model
 
