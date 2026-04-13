@@ -74,9 +74,9 @@ class FlipClient:
         response = requests.get(f"{self.base_url}/session/new", params=params, timeout=30)
         response.raise_for_status()
         payload = response.json()
-        sid = payload.get("sid")
+        sid = payload.get("sid") or payload.get("session_id")
         if not sid:
-            raise ValueError("Session ID missing in /session/new response")
+            raise ValueError(f"Session ID missing in /session/new response: {payload}")
         return sid
 
     def chat(self, model: str, sid: str, text: str) -> str:
@@ -273,6 +273,8 @@ class SuperTelegramBot:
             return self.flip.chat(session.model, session.sid, message)
         except Exception:
             session.sid = self.flip.new_session(model=session.model)
+            if not session.sid:
+                raise RuntimeError("Failed to create session.")
             return self.flip.chat(session.model, session.sid, message)
 
     def _get_valid_models(self, force_refresh: bool = False) -> List[str]:
