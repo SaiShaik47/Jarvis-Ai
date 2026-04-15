@@ -43,13 +43,7 @@ class FlipClient:
         self.http.headers.update(
             {
                 "origin": self.base_url,
-                "referer": f"{self.base_url}/",
                 "x-requested-with": "XMLHttpRequest",
-                "user-agent": (
-                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-                ),
-                "accept": "application/json, text/plain, */*",
             }
         )
 
