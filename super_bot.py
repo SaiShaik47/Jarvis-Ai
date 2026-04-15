@@ -268,21 +268,42 @@ class SuperTelegramBot:
             if not session.sid:
                 session.sid = self.flip.new_session(model=session.model)
 
-            answer = self._chat_with_retry(session, message)
+            answer, used_model = self._chat_with_retry(session, message)
+            if used_model != session.model:
+                old_model = session.model
+                session.model = used_model
+                await update.message.reply_text(
+                    f"⚠️ `{old_model}` failed right now. I switched to `{used_model}` automatically.",
+                    parse_mode="Markdown",
+                )
             session.history.append({"role": "user", "content": message})
             session.history.append({"role": "assistant", "content": answer})
             await self._reply_long(update, answer)
         except Exception as exc:  # noqa: BLE001
             await update.message.reply_text(f"Chat failed: {exc}")
 
-    def _chat_with_retry(self, session: ChatSession, message: str) -> str:
-        try:
-            return self.flip.chat(session.model, session.sid, message)
-        except Exception:
-            session.sid = self.flip.new_session(model=session.model)
-            if not session.sid:
-                raise RuntimeError("Failed to create session.")
-            return self.flip.chat(session.model, session.sid, message)
+    def _chat_with_retry(self, session: ChatSession, message: str) -> Tuple[str, str]:
+        models_to_try = [session.model] + [
+            model for model in self._get_valid_models() if model != session.model
+        ]
+        last_error: Optional[Exception] = None
+
+        for model in models_to_try:
+            sid = session.sid if model == session.model else None
+            for _ in range(2):
+                try:
+                    if not sid:
+                        sid = self.flip.new_session(model=model)
+                    reply = self.flip.chat(model, sid, message)
+                    session.sid = sid
+                    return reply, model
+                except Exception as exc:  # noqa: BLE001
+                    sid = None
+                    last_error = exc
+
+        if last_error is not None:
+            raise RuntimeError(f"All models failed for this prompt. Last error: {last_error}")
+        raise RuntimeError("All models failed for this prompt.")
 
     def _get_valid_models(self, force_refresh: bool = False) -> List[str]:
         if force_refresh or not self.valid_models:
