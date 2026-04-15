@@ -39,9 +39,16 @@ class ChatSession:
 class FlipClient:
     def __init__(self, base_url: str = BASE_URL):
         self.base_url = base_url.rstrip("/")
+        self.http = requests.Session()
+        self.http.headers.update(
+            {
+                "origin": self.base_url,
+                "x-requested-with": "XMLHttpRequest",
+            }
+        )
 
     def models(self) -> List[str]:
-        response = requests.get(f"{self.base_url}/models", timeout=30)
+        response = self.http.get(f"{self.base_url}/models", timeout=30)
         response.raise_for_status()
         data = response.json()
         if isinstance(data, list):
@@ -71,7 +78,7 @@ class FlipClient:
         params = {"model": model}
         if system_prompt:
             params["system_prompt"] = system_prompt
-        response = requests.get(f"{self.base_url}/session/new", params=params, timeout=30)
+        response = self.http.get(f"{self.base_url}/session/new", params=params, timeout=30)
         response.raise_for_status()
         payload = response.json()
         sid = payload.get("sid") or payload.get("session_id")
@@ -80,7 +87,7 @@ class FlipClient:
         return sid
 
     def chat(self, model: str, sid: str, text: str) -> str:
-        response = requests.get(
+        response = self.http.get(
             f"{self.base_url}/{model}/chat",
             params={"text": text, "sid": sid},
             timeout=60,
@@ -89,7 +96,7 @@ class FlipClient:
         return response.text
 
     def session_info(self, sid: str) -> str:
-        response = requests.get(f"{self.base_url}/session/{sid}", timeout=30)
+        response = self.http.get(f"{self.base_url}/session/{sid}", timeout=30)
         response.raise_for_status()
         return response.text
 
